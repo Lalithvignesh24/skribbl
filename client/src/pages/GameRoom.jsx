@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useParams, useLocation } from 'react-router-dom';
 import io from 'socket.io-client';
 import Canvas from '../components/Canvas';
+import Chat from '../components/Chat';
 
 const socket = io.connect("http://localhost:3001");
 
@@ -14,13 +15,14 @@ const GameRoom = () => {
     const [gameStarted, setGameStarted] = useState(false);
     const [isDrawer, setIsDrawer] = useState(false);
     const [currentWord, setCurrentWord] = useState("");
+    const [timeLeft, setTimeLeft] = useState(80);
 
     useEffect(() => {
         socket.emit('join_room', { roomId, name: playerName });
 
-        socket.on('update_players', (playerList) => {
-            setPlayers(playerList);
-        });
+        socket.on('update_players', (playerList) => setPlayers(playerList));
+
+        socket.on('timer_update', (time) => setTimeLeft(time));
 
         socket.on('game_started', (data) => {
             setGameStarted(true);
@@ -28,68 +30,81 @@ const GameRoom = () => {
             setCurrentWord(data.wordDisplay);
         });
 
-        socket.on('secret_word', (word) => {
-            setCurrentWord(word);
+        socket.on('secret_word', (word) => setCurrentWord(word));
+
+        socket.on('round_ended', (data) => {
+            setGameStarted(false);
+            alert(`${data.message} The word was: ${data.word}`);
         });
+        // Inside GameRoom.jsx useEffect
+socket.on('game_over', (finalPlayers) => {
+    const winner = [...finalPlayers].sort((a, b) => b.points - a.points)[0];
+    alert(`Game Over! Winner is ${winner.name} with ${winner.points} points!`);
+    setGameStarted(false);
+});
 
         return () => {
             socket.off('update_players');
             socket.off('game_started');
             socket.off('secret_word');
+            socket.off('timer_update');
+            socket.off('round_ended');
         };
     }, [roomId, playerName]);
 
-    const handleStartGame = () => {
-        socket.emit('start_game', roomId);
-    };
+    const handleStartGame = () => socket.emit('start_game', roomId);
 
     return (
-        <div className="min-h-screen bg-blue-500 p-6 flex flex-col items-center">
-            <div className="max-w-6xl w-full bg-gray-100 rounded-lg shadow-xl p-4 flex flex-col md:flex-row gap-4 relative">
-                
-                {/* START OVERLAY: Only for the owner/first player [cite: 223, 370] */}
+        <div className="min-h-screen bg-blue-600 p-4 flex flex-col items-center">
+            {/* TOP BAR WITH TIMER */}
+            <div className="w-full max-w-7xl flex justify-between items-center mb-4 px-4">
+                <div className="flex items-center gap-3 bg-white p-2 rounded-full shadow-lg border-2 border-yellow-400">
+                    <div className="bg-yellow-400 text-white w-12 h-12 rounded-full flex items-center justify-center font-black text-xl">
+                        {timeLeft}
+                    </div>
+                    <span className="pr-4 font-bold text-gray-700 uppercase text-xs tracking-widest">Time</span>
+                </div>
+                <div className="text-white font-bold bg-blue-900 px-6 py-2 rounded-full shadow-md border border-blue-400">
+                    Room: <span className="text-yellow-400 font-mono">{roomId}</span>
+                </div>
+            </div>
+
+            <div className="max-w-7xl w-full bg-gray-200 rounded-xl shadow-2xl p-4 flex flex-col lg:flex-row gap-4 relative overflow-hidden">
                 {!gameStarted && players.length > 0 && players[0].id === socket.id && (
-                    <div className="absolute inset-0 flex items-center justify-center bg-black bg-opacity-60 z-20 rounded-lg">
-                        <button 
-                            onClick={handleStartGame}
-                            className="bg-green-500 hover:bg-green-600 text-white text-3xl font-black py-6 px-12 rounded-full shadow-2xl transform hover:scale-110 transition duration-200"
-                        >
-                            START GAME
+                    <div className="absolute inset-0 flex items-center justify-center bg-black bg-opacity-70 z-30 rounded-xl">
+                        <button onClick={handleStartGame} className="bg-green-500 hover:bg-green-600 text-white text-4xl font-black py-8 px-16 rounded-full shadow-2xl transition animate-pulse">
+                            START GAME!
                         </button>
                     </div>
                 )}
 
-                {/* Left Sidebar: Player List [cite: 204, 396] */}
-                <div className="w-full md:w-1/4 bg-white rounded p-4 border-2 border-gray-300 shadow-sm">
-                    <h2 className="font-bold border-b pb-2 mb-4 text-gray-700 uppercase tracking-wider">Players</h2>
-                    <div className="space-y-2">
+                {/* Sidebar */}
+                <div className="w-full lg:w-1/5 bg-white rounded-lg p-4 border-2 border-gray-300 shadow-md">
+                    <h2 className="font-black border-b-2 border-gray-100 pb-2 mb-4 text-gray-600 uppercase text-xl">Players</h2>
+                    <div className="space-y-3">
                         {players.map((p) => (
-                            <div 
-                                key={p.id} 
-                                className={`flex justify-between p-2 rounded border ${p.id === socket.id ? 'bg-blue-100 border-blue-400' : 'bg-gray-50 border-gray-200'}`}
-                            >
-                                <span className="font-bold text-gray-800">
-                                    {p.name} {p.id === socket.id ? "(You)" : ""}
-                                </span>
-                                <span className="text-blue-600 font-black">{p.points}</span>
+                            <div key={p.id} className={`flex justify-between items-center p-3 rounded-lg border-2 ${p.id === socket.id ? 'bg-blue-50 border-blue-400' : 'bg-gray-50 border-gray-200'}`}>
+                                <span className="font-bold text-gray-800">{p.name} {p.id === socket.id ? "(You)" : ""}</span>
+                                <span className="text-blue-700 font-black">{p.points}</span>
                             </div>
                         ))}
                     </div>
                 </div>
 
-                {/* Center: Main Game Area [cite: 187, 290] */}
-                <div className="flex-1 flex flex-col bg-white rounded border-2 border-gray-300 shadow-sm overflow-hidden">
-                    <div className="bg-gray-800 text-white p-3 text-center font-mono font-bold tracking-[0.4em] text-3xl min-h-[60px]">
+                {/* Canvas */}
+                <div className="flex-1 flex flex-col bg-white rounded-lg border-2 border-gray-300 shadow-md overflow-hidden">
+                    <div className="bg-gray-800 text-white p-4 text-center font-mono font-bold tracking-[0.6em] text-4xl min-h-[80px] flex items-center justify-center">
                         {currentWord || "WAITING..."}
                     </div>
-                    <div className="flex-1 flex items-center justify-center p-4">
-                        <Canvas roomId={roomId} socket={socket} />
+                    <div className="flex-1 flex items-center justify-center p-4 bg-gray-50">
+                        <Canvas roomId={roomId} socket={socket} isDrawer={isDrawer}/>
                     </div>
                 </div>
-            </div>
 
-            <div className="mt-4 text-center text-white font-bold bg-blue-900 px-6 py-2 rounded-full shadow-lg">
-                Room ID: <span className="select-all font-mono">{roomId}</span>
+                {/* Chat */}
+                <div className="w-full lg:w-1/4">
+                    <Chat socket={socket} roomId={roomId} playerName={playerName} />
+                </div>
             </div>
         </div>
     );

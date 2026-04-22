@@ -17,90 +17,126 @@ const io = new Server(server, {
     cors: { origin: "http://localhost:5173" }
 });
 
-// MongoDB Connection [cite: 138, 258]
 mongoose.connect(process.env.MONGO_URI)
     .then(() => console.log("✅ MongoDB Connected"))
     .catch(err => console.log("❌ DB Connection Error:", err));
 
-// Global game state [cite: 203, 332]
 const rooms = {}; 
 
 io.on('connection', (socket) => {
     console.log(`User Connected: ${socket.id}`);
 
-    // Join Room & Duplicate Prevention [cite: 304, 355]
     socket.on('join_room', ({ roomId, name }) => {
         socket.join(roomId);
-
         if (!rooms[roomId]) {
             rooms[roomId] = { 
                 players: [], 
                 currentDrawer: null, 
                 gameStarted: false,
                 secretWord: "",
-                timer: 80 
+                timer: 80,
+                timerId: null
             };
         }
-
         const alreadyJoined = rooms[roomId].players.some(p => p.id === socket.id);
         if (!alreadyJoined) {
             rooms[roomId].players.push({ id: socket.id, name, points: 0 });
-            console.log(`👤 ${name} joined room: ${roomId}`);
         }
-
         io.to(roomId).emit('update_players', rooms[roomId].players);
     });
 
-    // Start Game Engine [cite: 224, 367]
-    socket.on('start_game', async (roomId) => {
-        if (rooms[roomId] && rooms[roomId].players.length >= 1) { // Adjusted to 1 for testing solo
-            rooms[roomId].gameStarted = true;
-            
-            // Pick drawer [cite: 225, 389]
-            const drawer = rooms[roomId].players[0];
-            rooms[roomId].currentDrawer = drawer.id;
+    // SINGLE MERGED START_GAME LOGIC
+    // Inside server/index.js, update the start_game and timer logic
 
-            try {
-                // Fetch random word from MongoDB [cite: 168, 390]
-                const randomWord = await Word.aggregate([{ $sample: { size: 1 } }]);
-                const secretWord = randomWord[0].text;
-                rooms[roomId].secretWord = secretWord;
+socket.on('start_game', (roomId) => {
+    const room = rooms[roomId];
+    if (room && room.players.length >= 1) {
+        room.gameStarted = true;
+        room.currentDrawerIndex = 0; // Start with the first player
+        startNewRound(roomId);
+    }
+});
 
-                // Broadcast state [cite: 227, 369]
-                io.to(roomId).emit('game_started', {
-                    drawerId: drawer.id,
-                    drawerName: drawer.name,
-                    wordDisplay: "_ ".repeat(secretWord.length).trim() 
-                });
+async function startNewRound(roomId) {
+    const room = rooms[roomId];
+    if (!room) return;
 
-                // Send actual word ONLY to drawer [cite: 23, 390]
-                io.to(drawer.id).emit('secret_word', secretWord);
+    // Reset round state
+    room.timer = 80;
+    const drawer = room.players[room.currentDrawerIndex];
+    room.currentDrawer = drawer.id;
 
-            } catch (err) {
-                console.error("Error fetching word from DB:", err);
+    try {
+        const randomWord = await Word.aggregate([{ $sample: { size: 1 } }]);
+        room.secretWord = randomWord[0].text;
+
+        io.to(roomId).emit('game_started', {
+            drawerId: drawer.id,
+            drawerName: drawer.name,
+            wordDisplay: "_ ".repeat(room.secretWord.length).trim()
+        });
+        io.to(drawer.id).emit('secret_word', room.secretWord);
+
+        // Timer Logic
+        if (room.timerId) clearInterval(room.timerId);
+        room.timerId = setInterval(() => {
+            room.timer--;
+            io.to(roomId).emit('timer_update', room.timer);
+
+            if (room.timer <= 0) {
+                clearInterval(room.timerId);
+                endRound(roomId);
             }
+        }, 1000);
+    } catch (err) { console.error(err); }
+}
+
+function endRound(roomId) {
+    const room = rooms[roomId];
+    io.to(roomId).emit('round_ended', { word: room.secretWord });
+
+    // Rotate to next player
+    room.currentDrawerIndex++;
+
+    if (room.currentDrawerIndex < room.players.length) {
+        // Next person's turn after a 5-second break
+        setTimeout(() => startNewRound(roomId), 5000);
+    } else {
+        // Everyone has drawn!
+        io.to(roomId).emit('game_over', room.players);
+        room.gameStarted = false;
+        room.currentDrawerIndex = 0;
+    }
+}
+
+    socket.on('send_message', ({ roomId, message, name }) => {
+        const room = rooms[roomId];
+        if (!room) return;
+        if (message.toLowerCase().trim() === room.secretWord.toLowerCase().trim() && room.gameStarted) {
+            const player = room.players.find(p => p.id === socket.id);
+            if (player && socket.id !== room.currentDrawer) {
+                player.points += 100;
+                io.to(roomId).emit('update_players', room.players);
+                io.to(roomId).emit('receive_message', { name: "System", message: `${name} guessed it!`, isCorrect: true });
+            }
+        } else {
+            io.to(roomId).emit('receive_message', { name, message, isCorrect: false });
         }
     });
 
-    // Drawing Sync [cite: 16, 57]
-    socket.on('draw_data', (data) => {
-        socket.to(data.roomId).emit('receive_draw', data);
-    });
+    socket.on('draw_data', (data) => socket.to(data.roomId).emit('receive_draw', data));
+    socket.on('clear_canvas', (roomId) => socket.to(roomId).emit('clear_canvas'));
 
-    socket.on('clear_canvas', (roomId) => {
-        socket.to(roomId).emit('clear_canvas');
-    });
-
-    // Cleanup [cite: 334, 359]
     socket.on('disconnect', () => {
         for (const roomId in rooms) {
             rooms[roomId].players = rooms[roomId].players.filter(p => p.id !== socket.id);
             io.to(roomId).emit('update_players', rooms[roomId].players);
-            if (rooms[roomId].players.length === 0) delete rooms[roomId];
+            if (rooms[roomId].players.length === 0) {
+                if (rooms[roomId].timerId) clearInterval(rooms[roomId].timerId);
+                delete rooms[roomId];
+            }
         }
     });
 });
 
-server.listen(process.env.PORT || 3001, () => {
-    console.log(`🚀 SERVER RUNNING ON PORT ${process.env.PORT || 3001}`);
-});
+server.listen(process.env.PORT || 3001, () => console.log(`🚀 SERVER RUNNING ON PORT 3001`));
