@@ -11,21 +11,31 @@ const GameRoom = () => {
     const location = useLocation();
     const playerName = location.state?.name || "Anonymous";
 
+    // Game States
     const [players, setPlayers] = useState([]);
     const [gameStarted, setGameStarted] = useState(false);
     const [isDrawer, setIsDrawer] = useState(false);
     const [currentWord, setCurrentWord] = useState("");
     const [timeLeft, setTimeLeft] = useState(80);
+    
+    // NEW: Word Selection State
+    const [wordOptions, setWordOptions] = useState([]);
 
     useEffect(() => {
         socket.emit('join_room', { roomId, name: playerName });
 
         socket.on('update_players', (playerList) => setPlayers(playerList));
-
         socket.on('timer_update', (time) => setTimeLeft(time));
+
+        // Listen for the 3 word choices (Drawer only)
+        socket.on('choose_word', (options) => {
+            setWordOptions(options);
+            setGameStarted(false); // Ensure game doesn't start until pick
+        });
 
         socket.on('game_started', (data) => {
             setGameStarted(true);
+            setWordOptions([]); // Clear options once game starts
             setIsDrawer(data.drawerId === socket.id);
             setCurrentWord(data.wordDisplay);
         });
@@ -34,17 +44,13 @@ const GameRoom = () => {
 
         socket.on('round_ended', (data) => {
             setGameStarted(false);
-            alert(`${data.message} The word was: ${data.word}`);
+            setWordOptions([]);
+            alert(`Round Over! The word was: ${data.word}`);
         });
-        // Inside GameRoom.jsx useEffect
-socket.on('game_over', (finalPlayers) => {
-    const winner = [...finalPlayers].sort((a, b) => b.points - a.points)[0];
-    alert(`Game Over! Winner is ${winner.name} with ${winner.points} points!`);
-    setGameStarted(false);
-});
 
         return () => {
             socket.off('update_players');
+            socket.off('choose_word');
             socket.off('game_started');
             socket.off('secret_word');
             socket.off('timer_update');
@@ -54,9 +60,15 @@ socket.on('game_over', (finalPlayers) => {
 
     const handleStartGame = () => socket.emit('start_game', roomId);
 
+    // NEW: Function to handle word selection
+    const handleSelectWord = (word) => {
+        socket.emit('word_chosen', { roomId, word });
+        setWordOptions([]);
+    };
+
     return (
         <div className="min-h-screen bg-blue-600 p-4 flex flex-col items-center">
-            {/* TOP BAR WITH TIMER */}
+            {/* Header / Timer */}
             <div className="w-full max-w-7xl flex justify-between items-center mb-4 px-4">
                 <div className="flex items-center gap-3 bg-white p-2 rounded-full shadow-lg border-2 border-yellow-400">
                     <div className="bg-yellow-400 text-white w-12 h-12 rounded-full flex items-center justify-center font-black text-xl">
@@ -70,11 +82,33 @@ socket.on('game_over', (finalPlayers) => {
             </div>
 
             <div className="max-w-7xl w-full bg-gray-200 rounded-xl shadow-2xl p-4 flex flex-col lg:flex-row gap-4 relative overflow-hidden">
-                {!gameStarted && players.length > 0 && players[0].id === socket.id && (
+                
+                {/* 1. START BUTTON OVERLAY (Only Owner) */}
+                {!gameStarted && wordOptions.length === 0 && players.length > 0 && players[0].id === socket.id && (
                     <div className="absolute inset-0 flex items-center justify-center bg-black bg-opacity-70 z-30 rounded-xl">
                         <button onClick={handleStartGame} className="bg-green-500 hover:bg-green-600 text-white text-4xl font-black py-8 px-16 rounded-full shadow-2xl transition animate-pulse">
                             START GAME!
                         </button>
+                    </div>
+                )}
+
+                {/* 2. WORD SELECTION OVERLAY (Only Drawer) */}
+                {wordOptions.length > 0 && (
+                    <div className="absolute inset-0 flex items-center justify-center bg-black bg-opacity-80 z-40 rounded-xl">
+                        <div className="bg-white p-8 rounded-2xl text-center shadow-2xl">
+                            <h2 className="text-2xl font-black mb-6 text-gray-700 uppercase">Choose a word to draw</h2>
+                            <div className="flex flex-col gap-4">
+                                {wordOptions.map((word) => (
+                                    <button
+                                        key={word}
+                                        onClick={() => handleSelectWord(word)}
+                                        className="bg-blue-500 hover:bg-blue-600 text-white font-bold py-3 px-8 rounded-lg text-xl transition transform hover:scale-105"
+                                    >
+                                        {word}
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
                     </div>
                 )}
 
@@ -91,10 +125,10 @@ socket.on('game_over', (finalPlayers) => {
                     </div>
                 </div>
 
-                {/* Canvas */}
+                {/* Main Content */}
                 <div className="flex-1 flex flex-col bg-white rounded-lg border-2 border-gray-300 shadow-md overflow-hidden">
                     <div className="bg-gray-800 text-white p-4 text-center font-mono font-bold tracking-[0.6em] text-4xl min-h-[80px] flex items-center justify-center">
-                        {currentWord || "WAITING..."}
+                        {currentWord || (wordOptions.length > 0 ? "CHOOSING..." : "WAITING...")}
                     </div>
                     <div className="flex-1 flex items-center justify-center p-4 bg-gray-50">
                         <Canvas roomId={roomId} socket={socket} isDrawer={isDrawer}/>
