@@ -1,15 +1,16 @@
-import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
-import Home from './pages/Home';
-import GameRoom from './pages/GameRoom'; // We'll create this next
+import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
+import LandingPage from "./pages/LandingPage";
+import GamePage from "./pages/GamePage";
 
 function App() {
   return (
-    <Router>
+    <BrowserRouter>
       <Routes>
-        <Route path="/" element={<Home />} />
-        <Route path="/game/:roomId" element={<GameRoom />} />
+        <Route path="/" element={<LandingPage />} />
+        <Route path="/game/:roomId" element={<GamePage />} />
+        <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
-    </Router>
+    </BrowserRouter>
   );
 }
 

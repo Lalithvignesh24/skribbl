@@ -1,3 +1,20 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+@layer base {
+  body {
+    @apply m-0 min-h-screen bg-sky-700 text-slate-100 antialiased;
+  }
+}
+
+@layer components {
+  .pattern-bg {
+    background-color: #1e4fa4;
+    background-image:
+      radial-gradient(circle at 20% 20%, rgba(255, 255, 255, 0.08) 2px, transparent 2px),
+      radial-gradient(circle at 80% 40%, rgba(255, 255, 255, 0.08) 2px, transparent 2px),
+      radial-gradient(circle at 40% 75%, rgba(255, 255, 255, 0.08) 2px, transparent 2px);
+    background-size: 44px 44px;
+  }
+}
