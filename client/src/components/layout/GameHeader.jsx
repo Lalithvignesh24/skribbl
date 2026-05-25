@@ -1,10 +1,19 @@
 import Button from "../ui/Button";
 
-export default function GameHeader({ timer, roundText, roomId, playerCount, onCopyRoomId, onOpenSettings }) {
+export default function GameHeader({
+  timer,
+  timerLabel = "Timer",
+  roundText,
+  roomId,
+  playerCount,
+  onCopyRoomId,
+  onOpenSettings,
+}) {
   return (
     <header className="mb-3 flex items-center justify-between rounded-2xl bg-slate-100 px-4 py-2 text-slate-900 shadow-lg">
       <div className="flex items-center gap-3">
         <span className="rounded-full bg-red-500 px-3 py-1 text-lg font-bold text-white">{timer}</span>
+        <span className="text-xs font-bold uppercase tracking-wide text-red-700">{timerLabel}</span>
         <span className="text-sm font-semibold">{roundText}</span>
       </div>
       <div className="flex items-center gap-2">
