@@ -1,13 +1,27 @@
 import { io } from "socket.io-client";
 
+const SOCKET_URL = import.meta.env.VITE_SOCKET_URL || "http://localhost:3001";
+
 let socketInstance;
 
 export function getSocket() {
   if (!socketInstance) {
-    socketInstance = io(import.meta.env.VITE_SOCKET_URL || "http://localhost:3001", {
+    socketInstance = io(SOCKET_URL, {
       autoConnect: true,
+      reconnection: true,
+      reconnectionAttempts: 10,
+      reconnectionDelay: 1000,
+      transports: ["websocket", "polling"],
     });
   }
 
   return socketInstance;
+}
+
+export function ensureSocketConnected() {
+  const socket = getSocket();
+  if (!socket.connected) {
+    socket.connect();
+  }
+  return socket;
 }

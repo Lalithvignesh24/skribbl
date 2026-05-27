@@ -7,6 +7,8 @@ const initialRoom = {
   language: "en",
   round: 1,
   totalRounds: 3,
+  gameStarted: false,
+  phase: "lobby",
 };
 
 export function GameProvider({ children }) {
@@ -19,8 +21,11 @@ export function GameProvider({ children }) {
   const [players, setPlayers] = useState([]);
   const [messages, setMessages] = useState([]);
   const [timer, setTimer] = useState(80);
+  const [timerType, setTimerType] = useState(null);
   const [wordHint, setWordHint] = useState("________");
   const [activeDrawerId, setActiveDrawerId] = useState("");
+  const [guessedPlayerIds, setGuessedPlayerIds] = useState([]);
+  const [hasGuessedCorrectly, setHasGuessedCorrectly] = useState(false);
 
   const value = useMemo(
     () => ({
@@ -34,12 +39,29 @@ export function GameProvider({ children }) {
       setMessages,
       timer,
       setTimer,
+      timerType,
+      setTimerType,
       wordHint,
       setWordHint,
       activeDrawerId,
       setActiveDrawerId,
+      guessedPlayerIds,
+      setGuessedPlayerIds,
+      hasGuessedCorrectly,
+      setHasGuessedCorrectly,
     }),
-    [currentPlayer, room, players, messages, timer, wordHint, activeDrawerId],
+    [
+      currentPlayer,
+      room,
+      players,
+      messages,
+      timer,
+      timerType,
+      wordHint,
+      activeDrawerId,
+      guessedPlayerIds,
+      hasGuessedCorrectly,
+    ],
   );
 
   return <GameContext.Provider value={value}>{children}</GameContext.Provider>;

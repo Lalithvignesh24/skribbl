@@ -61,7 +61,19 @@ export function useCanvas({ socket, roomId, canDraw }) {
   useEffect(() => {
     resizeCanvas();
     window.addEventListener("resize", resizeCanvas);
-    return () => window.removeEventListener("resize", resizeCanvas);
+
+    const canvas = canvasRef.current;
+    const parent = canvas?.parentElement;
+    const observer =
+      parent && typeof ResizeObserver !== "undefined"
+        ? new ResizeObserver(() => resizeCanvas())
+        : null;
+    if (parent && observer) observer.observe(parent);
+
+    return () => {
+      window.removeEventListener("resize", resizeCanvas);
+      observer?.disconnect();
+    };
   }, [resizeCanvas]);
 
   useEffect(() => {

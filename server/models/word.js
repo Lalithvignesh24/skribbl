@@ -1,8 +1,16 @@
-import mongoose from 'mongoose';
+import mongoose from "mongoose";
 
 const wordSchema = new mongoose.Schema({
-    text: { type: String, required: true, unique: true },
-    difficulty: { type: String, enum: ['easy', 'medium', 'hard'], default: 'easy' }
+  text: { type: String, required: true, unique: true, trim: true },
+  difficulty: {
+    type: String,
+    enum: ["easy", "medium", "hard"],
+    default: "easy",
+    index: true,
+  },
+  category: { type: String, default: "general", index: true },
 });
 
-export default mongoose.model('Word', wordSchema);
+wordSchema.index({ difficulty: 1, category: 1 });
+
+export default mongoose.model("Word", wordSchema);
