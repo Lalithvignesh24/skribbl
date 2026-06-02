@@ -362,6 +362,12 @@ export function onPlayerRemovedFromActiveGame(io, roomId, removedSocketId) {
 
   const eligible = getEligiblePlayers(room);
 
+  // NEW LOGIC: If only 1 player remains in an active game, end the game and declare them the winner!
+  if (eligible.length === 1) {
+    endGame(io, roomId);
+    return;
+  }
+
   if (room.currentDrawerIndex >= eligible.length) {
     room.currentDrawerIndex = Math.max(0, eligible.length - 1);
   }

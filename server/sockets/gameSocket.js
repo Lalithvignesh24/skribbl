@@ -83,12 +83,8 @@ export default function registerGameSocket(io) {
         socket.emit("room_error", "This room is full.");
         return;
       }
-
-      const joiningMidGame =
-        room.gameStarted &&
-        room.phase !== "lobby" &&
-        room.phase !== "game_over" &&
-        !wasInRoom;
+// Disable the mid-game spectator penalty for direct joins
+      const joiningMidGame = false;
 
       if (!wasInRoom) {
         removeSocketFromAllRooms(io, socket, { reason: "switch", exceptRoomId: trimmedRoomId });
@@ -105,7 +101,7 @@ export default function registerGameSocket(io) {
           name: trimmedName,
           avatar: avatar || "😀",
           score: 0,
-          joinedMidGame: joiningMidGame,
+          joinedMidGame: false, // Always false so they play instantly
         });
 
         emitSystemMessage(io, trimmedRoomId, `${trimmedName} joined the room`);

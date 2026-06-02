@@ -99,7 +99,6 @@ function launchPublicGame(io, roomId) {
   io.to(roomId).emit("online_match_ready", { roomId, inProgress: false });
   startGame(io, roomId);
 }
-
 export function handlePublicLobbyJoin(io, socket, roomId) {
   const room = getRoom(roomId);
   if (!room || room.gameStarted) return;
@@ -113,12 +112,14 @@ export function handlePublicLobbyJoin(io, socket, roomId) {
 
   const activeLobbyPlayers = room.players.filter((p) => !p.joinedMidGame);
 
-  if (activeLobbyPlayers.length >= MIN_PLAYERS_TO_START) {
+  // NEW LOGIC: Only skip the timer and start instantly if the room hits MAX_PLAYERS (10)
+  if (activeLobbyPlayers.length >= MAX_PLAYERS) {
     clearTimer(room, "lobby");
     tryStartPublicGame(io, roomId);
     return;
   }
 
+  // Otherwise, ALWAYS start or continue the 60-second countdown
   startLobbyCountdown(io, roomId);
 }
 

@@ -3,7 +3,7 @@ import { buildWordDisplay } from "./wordService.js";
 
 /** Elapsed ~40s and ~60s on an 80s round → timeLeft 40 and 20. */
 const HINT_TIME_FIRST = 40;
-const HINT_TIME_SECOND = 20;
+const HINT_TIME_SECOND = 30;
 
 function letterIndices(word) {
   const indices = [];

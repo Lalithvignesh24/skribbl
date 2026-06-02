@@ -155,14 +155,15 @@ export function addPlayerToRoom(io, socket, roomId, { name, avatar, source = "ma
     player.name = name;
     player.avatar = avatar || player.avatar;
   } else {
-    const joiningMidGame = room.gameStarted && room.phase !== "lobby" && room.phase !== "game_over";
+    // We no longer track if they joined mid-game because they play instantly
+    const joiningMidGame = false;
 
     player = {
       id: socket.id,
       name,
       avatar: avatar || "😀",
       score: 0,
-      joinedMidGame: joiningMidGame,
+      joinedMidGame: false, // Set to false to instantly allow guessing
     };
     room.players.push(player);
 
